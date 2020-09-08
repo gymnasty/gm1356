@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/karalabe/hid"
+	"github.com/Fatih-Cetinkaya-Bose/hid"
 )
 
 // Driver is GM1356 controller
