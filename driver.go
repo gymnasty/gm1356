@@ -130,11 +130,12 @@ func (d *Driver) handleInput() {
 					d.log("failed to write: ", err)
 				}
 			} else {
-				event := parseData(buf)
+				if event, ok := parseData(buf); ok {
 				d.eventBuffer <- event
 			}
 		}
 	}
+}
 }
 
 // read reads bytes from GM1356 device

@@ -1,6 +1,7 @@
 package gm1356
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -15,6 +16,7 @@ const (
 	nextImportDataRequestMark = 0xc4
 	nextImportBlockMark       = 0xfd
 	noImportDataMark          = 0xff
+	unexpectedMark            = 0xff
 
 	// flags
 	timeWeightFlags      = 0x40
@@ -151,11 +153,16 @@ func getConfigurationFlags(config Config) byte {
 	return byte(flags)
 }
 
-func parseData(data []byte) Event {
-	if data[0] == configureResponseMark {
-		return ConfiguredEvent{}
+func parseData(data []byte) (Event, bool) {
+	switch data[0] {
+	case configureResponseMark:
+		return ConfiguredEvent{}, true
+	case unexpectedMark:
+		fmt.Println("unexpected input", data)
+		return nil, false
+	default:
+		return parseMeasureData(data), true
 	}
-	return parseMeasureData(data)
 }
 
 func parseMeasureData(data []byte) MeasuredEvent {
