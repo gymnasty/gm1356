@@ -99,12 +99,13 @@ func (d *Driver) EventChannel() <-chan Event {
 
 // handleInput reads date and enqueue event
 func (d *Driver) handleInput() {
-	isFirstResponse := true
+	isImportingFirstResponse := true
 	for {
 		select {
 		case <-d.ctx.Done():
 			return
 		default:
+			// read
 			buf, err := d.read()
 			if err != nil {
 				if err == hid.ErrDeviceClosed {
@@ -113,22 +114,24 @@ func (d *Driver) handleInput() {
 				}
 				d.log("failed to read: ", err)
 			}
-			if err := d.write(newNextImportDataRequest(isFirstResponse)); err != nil {
+			if d.IsImporting() {
+				// process import data
+				if err := d.importer.Write(buf); err != nil {
 				if err == hid.ErrDeviceClosed {
 					d.log("device closed")
 					return
 				}
 				d.log("failed to write: ", err)
 			}
-			isFirstResponse = false
-			if d.IsImporting() {
-				if err := d.importer.Write(buf); err != nil {
+				// request next import data
+				if err := d.write(newNextImportDataRequest(isImportingFirstResponse)); err != nil {
 					if err == hid.ErrDeviceClosed {
 						d.log("device closed")
 						return
 					}
 					d.log("failed to write: ", err)
 				}
+				isImportingFirstResponse = false
 			} else {
 				if event, ok := parseData(buf); ok {
 				d.eventBuffer <- event
@@ -149,13 +152,13 @@ func (d *Driver) read() ([]byte, error) {
 	if n != 8 {
 		return nil, errors.New("unexpected read size")
 	}
-	//fmt.Println("read", time.Now(), buf)
+	// d.log("read", time.Now(), buf)
 	return buf, nil
 }
 
 // write writes bytes to GM1356 device
 func (d *Driver) write(data []byte) error {
-	//fmt.Println("write", time.Now(), data)
+	// d.log("write", time.Now(), data)
 	n, err := d.device.Write(data)
 	if err != nil {
 		return err
