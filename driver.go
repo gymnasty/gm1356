@@ -3,6 +3,7 @@ package gm1356
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Fatih-Cetinkaya-Bose/hid"
@@ -15,6 +16,7 @@ type Driver struct {
 	importer    *importer
 	ctx         context.Context
 	cancel      context.CancelFunc
+	log         func(...interface{})
 }
 
 // Open opens GM1356 device
@@ -28,10 +30,14 @@ func Open(eventBufferSize uint64) (*Driver, error) {
 		return nil, err
 	}
 	eventBuffer := make(chan Event, eventBufferSize)
+	logFunc := func(a ...interface{}) {
+		fmt.Println(a...)
+	}
 	driver := &Driver{
 		device:      device,
 		eventBuffer: eventBuffer,
 		importer:    newImporter(eventBuffer),
+		log:         logFunc,
 	}
 	driver.ctx, driver.cancel = context.WithCancel(context.Background())
 	go driver.handleInput()
@@ -101,15 +107,27 @@ func (d *Driver) handleInput() {
 		default:
 			buf, err := d.read()
 			if err != nil {
-				panic(err)
+				if err == hid.ErrDeviceClosed {
+					d.log("device closed")
+					return
+				}
+				d.log("failed to read: ", err)
 			}
 			if err := d.write(newNextImportDataRequest(isFirstResponse)); err != nil {
-				panic(err)
+				if err == hid.ErrDeviceClosed {
+					d.log("device closed")
+					return
+				}
+				d.log("failed to write: ", err)
 			}
 			isFirstResponse = false
 			if d.IsImporting() {
 				if err := d.importer.Write(buf); err != nil {
-					panic(err)
+					if err == hid.ErrDeviceClosed {
+						d.log("device closed")
+						return
+					}
+					d.log("failed to write: ", err)
 				}
 			} else {
 				event := parseData(buf)
